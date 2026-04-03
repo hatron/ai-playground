@@ -9,7 +9,9 @@ I wanted to be able to use different LLMs, but I have set OpenAI as the default.
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- If you're not running Ollama locally, you need one or more API keys to fetch content using OpenAI or Gemini
+- If you're not running Ollama locally, you need one or more API keys to fetch content using [OpenAI](https://www.openai.com) or [Gemini](https://gemini.google.com/)
+
+I find it really easy using _Ollama_ for this kind of work. Visit their website to [learn more about Ollama](https://ollama.com/).
 
 ## Get started
 
@@ -39,8 +41,8 @@ uv run python webscraper.py "https://example.com" --provider google
 
 ## Configuration
 
-- **`env`:** Copy `.env.example` to `.env`. That example file is safe to leave on GitHub; **do not** put any secrets in it!
+- **`env`:** Copy `.env.example` to `.env`. Please note that `.env.example` is safe to leave on GitHub, **do not** put any secrets in it!
 - **`uv.lock`:** Commit this file for reusable installations (recommended).
 
 ## License
-GPL-3.0
+GPL-3.0. Please see `LICENSE` for more information.
