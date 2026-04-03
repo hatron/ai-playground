@@ -2,10 +2,11 @@
 # @Author: Håkon Trønnes - hatron
 #
 # Usage:
-#   python webscraper.py "https://example.com"
+#   python webscraper.py "https://example.com"                    # using OpenAI as default
 #   python webscraper.py "https://spa.example.com" --render       # force Chromium (CSR/SPA)
 #   python webscraper.py "https://spa.example.com" --auto-render  # browser only if static text is tiny
-#   python webscraper.py URL --provider ollama
+#   python webscraper.py <URL> --provider ollama                  # using Ollama
+#   python webscraper.py <URL> --provider google                  # using Gemini
 #
 # After first install: playwright install chromium
 
@@ -151,15 +152,18 @@ def _load_html(url: str, *, use_browser: bool) -> str:
         sys.exit(f"Fetch failed: {e}")
 
 
-def _extract_text(url: str, *, render: bool, auto_render: bool) -> str:
+def _extract_page(url: str, *, render: bool, auto_render: bool) -> tuple[str, str]:
+    """Return (page title, plain body text) from the final fetch (static or browser)."""
     html = _load_html(url, use_browser=render)
-    text = Website(html).text
+    page = Website(html)
+    title, text = page.title, page.text
     if auto_render and not render and len(text) < AUTO_RENDER_MIN_CHARS:
         try:
-            text = Website(fetch_html_rendered(url)).text
+            page = Website(fetch_html_rendered(url))
+            title, text = page.title, page.text
         except Exception as e:
             sys.exit(f"Auto-render (Playwright) failed: {e}")
-    return text
+    return title, text
 
 
 SUMMARIZERS: dict[str, Callable[[str, str], str]] = {
@@ -208,7 +212,7 @@ def main() -> None:
     if args.render and args.auto_render:
         sys.exit("Use either --render or --auto-render, not both.")
 
-    text = _extract_text(url, render=args.render, auto_render=args.auto_render)
+    title, text = _extract_page(url, render=args.render, auto_render=args.auto_render)
     if not text:
         sys.exit(
             "No text extracted (empty document or blocked). "
@@ -228,7 +232,8 @@ def main() -> None:
             )
         raise
 
-    _console.print(Markdown(summary))
+    heading = " ".join(title.split())
+    _console.print(Markdown(f"# {heading}\n\n{summary}"))
 
 
 if __name__ == "__main__":
