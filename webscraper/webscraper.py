@@ -40,10 +40,12 @@ class Website:
     """Parse fetched HTML into a title and plain text (noise tags stripped)."""
 
     def __init__(self, html: str) -> None:
+        # Choosing lxml to be able to parse larger web sites.
         soup = BeautifulSoup(html, "lxml")
         raw_title = soup.title.get_text(strip=True) if soup.title else ""
         self.title = raw_title or "No title found"
 
+        # Skipping noisy tags
         for tag in soup(["script", "style", "noscript", "img", "input"]):
             tag.decompose()
 

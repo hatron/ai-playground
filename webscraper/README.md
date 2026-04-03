@@ -17,7 +17,7 @@ I find it really easy using _Ollama_ for this kind of work. Visit their website 
 
 ```bash
 git clone https://github.com/hatron/ai-playground.git
-cd ai-playground
+cd ai-playground/webscraper
 uv sync
 cp .env.example .env
 # Edit your .env file with your API keys or Ollama settings
