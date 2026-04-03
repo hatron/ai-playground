@@ -44,5 +44,15 @@ uv run python webscraper.py "https://example.com" --provider google
 - **`env`:** Copy `.env.example` to `.env`. Please note that `.env.example` is safe to leave on GitHub, **do not** put any secrets in it!
 - **`uv.lock`:** Commit this file for reusable installations (recommended).
 
+## Help
+
+If you need help when running the script in your CLI, you can use the following command:
+
+```bash
+uv run python webscraper.py --help
+```
+
+This will display a short help text explaining the different flags available.
+
 ## License
 GPL-3.0. Please see `LICENSE` for more information.
