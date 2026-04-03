@@ -1,0 +1,4 @@
+# Ofte opprettet ved feil cwd — prosjektet bruker webscraper/.venv
+.venv/
+__pycache__/
+*.py[cod]

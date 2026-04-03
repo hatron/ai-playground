@@ -10,3 +10,7 @@ Each project has its own folder.
 
 Current projects include:
 - AI supported [Web scraper](/webscraper)
+
+## License
+All folders have their own LICENSE file which shows their actual license.
+Most projects within this folder will be GPL-3.0.
