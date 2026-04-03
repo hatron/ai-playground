@@ -19,17 +19,23 @@ cd ai-playground
 uv sync
 cp .env.example .env
 # Edit your .env file with your API keys or Ollama settings
+```
+The first time, you need to install chromium for Playwright
 
+```bash
 # Playwright (first time)
 uv run playwright install chromium
+```
 
+To run the Webscraper, choose if you want to use OpenAI (no flags needed) or other models (see code for flags). See on the top of `webscraper.py` for more CLI-flags (`--render`, `--auto-render` etc.).
+
+```bash
 # Running the Webscraper
-uv run python webscraper.py "https://example.com"
+uv run python webscraper.py "https://example.com" # will use OpenAI as default provider
 uv run python webscraper.py "https://example.com" --provider ollama
 uv run python webscraper.py "https://example.com" --provider google
 ```
 
-See on the top of `webscraper.py` for more CLI-flags (`--render`, `--auto-render` etc.).
 
 ## Configuration
 
