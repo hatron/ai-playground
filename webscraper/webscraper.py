@@ -199,7 +199,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--system-prompt",
         default=DEFAULT_SYSTEM_PROMPT,
-        help="System prompt for the summarizer.",
+        help="System prompt for the AI summarizer.",
     )
     return p.parse_args()
 
