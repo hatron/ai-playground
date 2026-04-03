@@ -1,16 +1,20 @@
-# AI-playground - Webscraper
+# AI-playground - *Webscraper*
 
-Experimenting with a Python AI supported web scraper using different LLMs.
+
+## Background
+I wanted to experiment using AI APIs and Python to build a project, and the choice came down to an AI supported web scraper.
+I wanted to be able to use different LLMs, but I have set OpenAI as the default. Possible other APIs included in the project (so far) are Ollama and Gemini.
 
 ## Requirements to run project
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
+- If you're not running Ollama locally, you need one or more API keys to fetch content using OpenAI or Gemini
 
 ## Get started
 
 ```bash
-git clone <https://github.com/hatron/ai-playground.git>
+git clone https://github.com/hatron/ai-playground.git
 cd ai-playground
 uv sync
 cp .env.example .env
@@ -33,4 +37,4 @@ See on the top of `webscraper.py` for more CLI-flags (`--render`, `--auto-render
 - **`uv.lock`:** Commit this file for reusable installations (recommended).
 
 ## License
-Not yet set
+GPL-3.0

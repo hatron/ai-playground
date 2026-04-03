@@ -1,5 +1,5 @@
 # A webscraper project made for fun and for learning more Python and using AI APIs
-# @Author: Håkon Trønnes
+# @Author: Håkon Trønnes - hatron
 #
 # Usage:
 #   python webscraper.py "https://example.com"
@@ -23,27 +23,25 @@ from openai import NotFoundError, OpenAI
 from rich.console import Console
 from rich.markdown import Markdown
 
+_console = Console()
+
 MAX_TEXT_CHARS = 80_000
 AUTO_RENDER_MIN_CHARS = 400
 
-DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant with technical knowledge.
-You receive plain text extracted from a webpage. Summarize the main content clearly
-for the average reader. If the text looks like boilerplate or is very short, say so
-and summarize what is available. Respond in markdown."""
+DEFAULT_SYSTEM_PROMPT = """You are an assistant that analyzes the contents of a website 
+and provides a short summary, ignoring text that might be navigation related. 
+Summarize the main content clearly for the average reader. 
+If the text looks like boilerplate or is very short, say so and summarize what is available. 
+Respond in markdown."""
 
 
 class Website:
     """Parse fetched HTML into a title and plain text (noise tags stripped)."""
 
-    def __init__(self, url: str, html: str) -> None:
-        self.url = url
+    def __init__(self, html: str) -> None:
         soup = BeautifulSoup(html, "lxml")
-
-        if soup.title:
-            title = soup.title.get_text(strip=True)
-            self.title = title if title else "No title found"
-        else:
-            self.title = "No title found"
+        raw_title = soup.title.get_text(strip=True) if soup.title else ""
+        self.title = raw_title or "No title found"
 
         for tag in soup(["script", "style", "noscript", "img", "input"]):
             tag.decompose()
@@ -155,23 +153,16 @@ def _load_html(url: str, *, use_browser: bool) -> str:
 
 def _extract_text(url: str, *, render: bool, auto_render: bool) -> str:
     html = _load_html(url, use_browser=render)
-    text = Website(url, html).text
-    if (
-        auto_render
-        and not render
-        and len(text) < AUTO_RENDER_MIN_CHARS
-    ):
+    text = Website(html).text
+    if auto_render and not render and len(text) < AUTO_RENDER_MIN_CHARS:
         try:
-            html = fetch_html_rendered(url)
-            text = Website(url, html).text
+            text = Website(fetch_html_rendered(url)).text
         except Exception as e:
             sys.exit(f"Auto-render (Playwright) failed: {e}")
     return text
 
 
-Summarizer = Callable[[str, str], str]
-
-SUMMARIZERS: dict[str, Summarizer] = {
+SUMMARIZERS: dict[str, Callable[[str, str], str]] = {
     "openai": summarize_openai,
     "ollama": summarize_ollama,
     "google": summarize_google,
@@ -237,7 +228,7 @@ def main() -> None:
             )
         raise
 
-    Console().print(Markdown(summary))
+    _console.print(Markdown(summary))
 
 
 if __name__ == "__main__":
