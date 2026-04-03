@@ -1,37 +1,36 @@
-# ai-playground
+# AI-playground - Webscraper
 
-Lek/eksperimenter med nettskraping og ulike LLM-leverandører.
+Experimenting with a Python AI supported web scraper using different LLMs.
 
-## Krav
+## Requirements to run project
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
 
-## Kom i gang
+## Get started
 
 ```bash
-git clone <repo-url>
+git clone <https://github.com/hatron/ai-playground.git>
 cd ai-playground
 uv sync
 cp .env.example .env
-# Rediger .env med API-nøkler / Ollama-innstillinger
+# Edit your .env file with your API keys or Ollama settings
 
-# Playwright (første gang)
+# Playwright (first time)
 uv run playwright install chromium
 
-# Kjøring
+# Running the Webscraper
 uv run python webscraper.py "https://example.com"
 uv run python webscraper.py "https://example.com" --provider ollama
 uv run python webscraper.py "https://example.com" --provider google
 ```
 
-Se `webscraper.py` øverst for flere CLI-flagg (`--render`, `--auto-render` osv.).
+See on the top of `webscraper.py` for more CLI-flags (`--render`, `--auto-render` etc.).
 
-## Konfigurasjon
+## Configuration
 
-- **`env`:** Kopier `.env.example` til `.env`. Den eksempelfila er trygg å ha på GitHub; **ikke** legg inn hemmeligheter der.
-- **`uv.lock`:** Committ den for reproduserbare installasjoner (anbefalt).
+- **`env`:** Copy `.env.example` to `.env`. That example file is safe to leave on GitHub; **do not** put any secrets in it!
+- **`uv.lock`:** Commit this file for reusable installations (recommended).
 
-## Lisens
-
-Ikke satt — legg inn en `LICENSE` om du vil at andre skal vite brukervilkår.
+## License
+Not yet set

@@ -9,8 +9,6 @@
 #
 # After first install: playwright install chromium
 
-from __future__ import annotations
-
 import argparse
 import os
 import re
@@ -33,7 +31,27 @@ You receive plain text extracted from a webpage. Summarize the main content clea
 for the average reader. If the text looks like boilerplate or is very short, say so
 and summarize what is available. Respond in markdown."""
 
-_USER_CONTENT_PREFIX = "Webpage text extraction follows:\n\n"
+
+class Website:
+    """Parse fetched HTML into a title and plain text (noise tags stripped)."""
+
+    def __init__(self, url: str, html: str) -> None:
+        self.url = url
+        soup = BeautifulSoup(html, "lxml")
+
+        if soup.title:
+            title = soup.title.get_text(strip=True)
+            self.title = title if title else "No title found"
+        else:
+            self.title = "No title found"
+
+        for tag in soup(["script", "style", "noscript", "img", "input"]):
+            tag.decompose()
+
+        root = soup.body if soup.body else soup
+        raw = root.get_text(separator="\n", strip=True)
+        lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+        self.text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def fetch_html_static(url: str, timeout: float = 30.0) -> str:
@@ -60,15 +78,6 @@ def fetch_html_rendered(url: str, timeout_ms: int = 60_000, settle_ms: int = 2_0
             browser.close()
 
 
-def html_to_text(html: str) -> str:
-    soup = BeautifulSoup(html, "lxml")
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-    text = soup.get_text(separator="\n", strip=True)
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
-
-
 def _truncated_extract(text: str) -> str:
     chunk = text[:MAX_TEXT_CHARS]
     if len(text) > MAX_TEXT_CHARS:
@@ -92,7 +101,7 @@ def _summarize_openai_chat(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": _USER_CONTENT_PREFIX + _truncated_extract(text)},
+            {"role": "user", "content": _truncated_extract(text)},
         ],
         temperature=0.3,
     )
@@ -130,9 +139,7 @@ def summarize_google(text: str, system_prompt: str) -> str:
         sys.exit("GOOGLE_API_KEY is not set.")
     model = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
     client = genai.Client(api_key=api_key)
-    prompt = (
-        f"{system_prompt}\n\n{_USER_CONTENT_PREFIX}{_truncated_extract(text)}"
-    )
+    prompt = f"{system_prompt}\n\n{_truncated_extract(text)}"
     response = client.models.generate_content(model=model, contents=prompt)
     return (response.text or "").strip()
 
@@ -148,7 +155,7 @@ def _load_html(url: str, *, use_browser: bool) -> str:
 
 def _extract_text(url: str, *, render: bool, auto_render: bool) -> str:
     html = _load_html(url, use_browser=render)
-    text = html_to_text(html)
+    text = Website(url, html).text
     if (
         auto_render
         and not render
@@ -156,7 +163,7 @@ def _extract_text(url: str, *, render: bool, auto_render: bool) -> str:
     ):
         try:
             html = fetch_html_rendered(url)
-            text = html_to_text(html)
+            text = Website(url, html).text
         except Exception as e:
             sys.exit(f"Auto-render (Playwright) failed: {e}")
     return text
