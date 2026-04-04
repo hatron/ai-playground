@@ -42,6 +42,7 @@ uv run python webscraper.py "https://example.com" --provider google
 ## Configuration
 
 - **`env`:** Copy `.env.example` to `.env`. Please note that `.env.example` is safe to leave on GitHub, **do not** put any secrets in it!
+- **Gemini:** Uses the same OpenAI Python SDK against Google’s [OpenAI-compatible Gemini endpoint](https://ai.google.dev/gemini-api/docs/openai) (`GOOGLE_BASE_URL` must include `/v1beta/openai/` unless you override it).
 - **`uv.lock`:** Commit this file for reusable installations (recommended).
 
 ## Help

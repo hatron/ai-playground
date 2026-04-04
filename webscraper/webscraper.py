@@ -7,19 +7,20 @@
 #   python webscraper.py "https://spa.example.com" --auto-render  # browser only if static text is tiny
 #   python webscraper.py <URL> --provider ollama                  # using Ollama
 #   python webscraper.py <URL> --provider google                  # using Gemini
+#   python webscraper.py <URL> --provider anthropic               # using Claude
 #
 # After first install: playwright install chromium
 
 import argparse
 import os
-import re
 import sys
-from typing import Callable
+from typing import Literal
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+import anthropic
 from openai import NotFoundError, OpenAI
 from rich.console import Console
 from rich.markdown import Markdown
@@ -52,9 +53,10 @@ class Website:
         root = soup.body if soup.body else soup
         raw = root.get_text(separator="\n", strip=True)
         lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
-        self.text = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+        self.text = "\n".join(lines)
 
 
+# Static webpage - SSR or SSG
 def fetch_html_static(url: str, timeout: float = 30.0) -> str:
     r = requests.get(
         url,
@@ -64,8 +66,8 @@ def fetch_html_static(url: str, timeout: float = 30.0) -> str:
     r.raise_for_status()
     return r.text
 
-
-def fetch_html_rendered(url: str, timeout_ms: int = 60_000, settle_ms: int = 2_000) -> str:
+# Client side rendered
+def fetch_html_rendered(url: str, timeout_ms: int = 60_000) -> str:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -73,7 +75,7 @@ def fetch_html_rendered(url: str, timeout_ms: int = 60_000, settle_ms: int = 2_0
         try:
             page = browser.new_page()
             page.goto(url, wait_until="load", timeout=timeout_ms)
-            page.wait_for_timeout(settle_ms)
+            page.wait_for_load_state("networkidle", timeout=timeout_ms)
             return page.content()
         finally:
             browser.close()
@@ -85,8 +87,7 @@ def _truncated_extract(text: str) -> str:
         chunk += "\n\n[... truncated for context length ...]"
     return chunk
 
-
-def _summarize_openai_chat(
+def _openai_sdk_chat(
     *,
     model: str,
     api_key: str,
@@ -108,41 +109,67 @@ def _summarize_openai_chat(
     )
     return completion.choices[0].message.content or ""
 
-
-def summarize_openai(text: str, system_prompt: str) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        sys.exit("OPENAI_API_KEY is not set (check your .env).")
-    return _summarize_openai_chat(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        api_key=api_key,
-        base_url=os.getenv("OPENAI_BASE_URL") or None,
-        system_prompt=system_prompt,
-        text=text,
+# Anthropic Claude
+def _anthropic_chat(*, model: str, api_key: str, system_prompt: str, text: str) -> str:
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        system=system_prompt,
+        messages=[{"role": "user", "content": _truncated_extract(text)}],
     )
+    return message.content[0].text
 
 
-def summarize_ollama(text: str, system_prompt: str) -> str:
-    return _summarize_openai_chat(
-        model=os.getenv("OLLAMA_MODEL", "llama3.2"),
-        api_key=os.getenv("OLLAMA_API_KEY") or "ollama",
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
-        system_prompt=system_prompt,
-        text=text,
-    )
+Provider = Literal["openai", "ollama", "google", "anthropic"]
+
+PROVIDER_CHOICES: tuple[Provider, ...] = ("openai", "ollama", "google", "anthropic")
 
 
-def summarize_google(text: str, system_prompt: str) -> str:
-    from google import genai
-
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        sys.exit("GOOGLE_API_KEY is not set.")
-    model = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
-    client = genai.Client(api_key=api_key)
-    prompt = f"{system_prompt}\n\n{_truncated_extract(text)}"
-    response = client.models.generate_content(model=model, contents=prompt)
-    return (response.text or "").strip()
+def summarize(text: str, system_prompt: str, *, provider: Provider) -> str:
+    """All providers use the OpenAI Python SDK; Gemini targets Google's OpenAI-compatible endpoint."""
+    match provider:
+        case "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                sys.exit("OPENAI_API_KEY is not set (check your .env).")
+            return _openai_sdk_chat(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                api_key=api_key,
+                base_url=os.getenv("OPENAI_BASE_URL") or None,
+                system_prompt=system_prompt,
+                text=text,
+            )
+        case "ollama":
+            return _openai_sdk_chat(
+                model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+                api_key=os.getenv("OLLAMA_API_KEY") or "ollama",
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+                system_prompt=system_prompt,
+                text=text,
+            )
+        case "google":
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                sys.exit("GOOGLE_API_KEY is not set.")
+            base = (os.getenv("GOOGLE_BASE_URL") or "").strip()
+            return _openai_sdk_chat(
+                model=os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"),
+                api_key=api_key,
+                base_url=base,
+                system_prompt=system_prompt,
+                text=text,
+            )
+        case "anthropic":
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                sys.exit("ANTHROPIC_API_KEY is not set (check your .env).")
+            return _anthropic_chat(
+                model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+                api_key=api_key,
+                system_prompt=system_prompt,
+                text=text,
+            )
 
 
 def _load_html(url: str, *, use_browser: bool) -> str:
@@ -168,13 +195,6 @@ def _extract_page(url: str, *, render: bool, auto_render: bool) -> tuple[str, st
     return title, text
 
 
-SUMMARIZERS: dict[str, Callable[[str, str], str]] = {
-    "openai": summarize_openai,
-    "ollama": summarize_ollama,
-    "google": summarize_google,
-}
-
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Fetch a webpage, extract text, summarize with an LLM.",
@@ -182,7 +202,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("url", help="Full URL to scrape (e.g. https://example.com).")
     p.add_argument(
         "--provider",
-        choices=tuple(SUMMARIZERS),
+        choices=PROVIDER_CHOICES,
         default="openai",
         help="LLM backend (default: openai).",
     )
@@ -205,6 +225,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     load_dotenv()
     args = parse_args()
     url = args.url.strip()
@@ -222,7 +243,7 @@ def main() -> None:
         )
 
     try:
-        summary = SUMMARIZERS[args.provider](text, args.system_prompt)
+        summary = summarize(text, args.system_prompt, provider=args.provider)
     except NotFoundError as err:
         if args.provider == "ollama":
             model = os.getenv("OLLAMA_MODEL", "llama3.2")
@@ -230,6 +251,13 @@ def main() -> None:
                 f"Ollama: The model {model!r} doesn't exist (404). "
                 "Check `ollama list`, pull model with `ollama pull <model_name>`, "
                 "and update OLLAMA_MODEL in .env if necessary. "
+                f"Details: {err}"
+            )
+        if args.provider == "google":
+            model = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
+            sys.exit(
+                f"Gemini: model {model!r} or endpoint failed (404). "
+                f"Check GOOGLE_MODEL and GEMINI_OPENAI_BASE_URL for OpenAI-compatible API). "
                 f"Details: {err}"
             )
         raise
