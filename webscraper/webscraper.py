@@ -21,6 +21,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import anthropic
+from google import genai
 from openai import NotFoundError, OpenAI
 from rich.console import Console
 from rich.markdown import Markdown
@@ -87,6 +88,7 @@ def _truncated_extract(text: str) -> str:
         chunk += "\n\n[... truncated for context length ...]"
     return chunk
 
+# OpenAI
 def _openai_sdk_chat(
     *,
     model: str,
@@ -109,6 +111,20 @@ def _openai_sdk_chat(
     )
     return completion.choices[0].message.content or ""
 
+# Google Gemini
+def _google_chat(*, model: str, api_key: str, system_prompt: str, text: str) -> str:
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model,
+        contents=_truncated_extract(text),
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.3,
+        ),
+    )
+    return response.text or ""
+
+
 # Anthropic Claude
 def _anthropic_chat(*, model: str, api_key: str, system_prompt: str, text: str) -> str:
     client = anthropic.Anthropic(api_key=api_key)
@@ -127,7 +143,7 @@ PROVIDER_CHOICES: tuple[Provider, ...] = ("openai", "ollama", "google", "anthrop
 
 
 def summarize(text: str, system_prompt: str, *, provider: Provider) -> str:
-    """All providers use the OpenAI Python SDK; Gemini targets Google's OpenAI-compatible endpoint."""
+    """OpenAI and Ollama use the OpenAI Python SDK; Gemini uses Google's genai and Claude uses Anthropics SDK."""
     match provider:
         case "openai":
             api_key = os.getenv("OPENAI_API_KEY")
@@ -152,11 +168,9 @@ def summarize(text: str, system_prompt: str, *, provider: Provider) -> str:
             api_key = os.getenv("GOOGLE_API_KEY")
             if not api_key:
                 sys.exit("GOOGLE_API_KEY is not set.")
-            base = (os.getenv("GOOGLE_BASE_URL") or "").strip()
-            return _openai_sdk_chat(
+            return _google_chat(
                 model=os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"),
                 api_key=api_key,
-                base_url=base,
                 system_prompt=system_prompt,
                 text=text,
             )
